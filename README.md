@@ -1,0 +1,2 @@
+# autopipes
+Solver for Hexapipes
