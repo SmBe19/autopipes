@@ -1,18 +1,40 @@
-from typing import Tuple
+import math
+from typing import Tuple, List
 
 from PIL import Image
 
+from puzzle import Puzzle, Tile
+from solver import FirstSolver, RandomSolver
 from ui import UI
-from util import color_dist_sq
+from util import color_dist_sq, required_rotations
+
+SOLVERS = {
+    'random': RandomSolver,
+    'first': FirstSolver,
+}
 
 PUZZLE_BOX_BORDER = (208, 221, 233)
 TILE_BORDER = (170, 170, 170)
 TILE_BACKGROUND = (221, 221, 221)
 PIPE_BACKGROUND = (255, 255, 255)
+NEIGHBORS = 6
+
+
+class PuzzleImage:
+    x: int
+    y: int
+    im: Image
+
+    def __init__(self, x: int, y: int, im: Image):
+        self.x = x
+        self.y = y
+        self.im = im
 
 
 class PuzzleManager:
     ui: UI
+    images: List[PuzzleImage]
+    puzzle: Puzzle
     puzzle_type: str
     puzzle_box: Tuple[int, int, int, int]
     puzzle_size = Tuple[int, int]
@@ -23,6 +45,8 @@ class PuzzleManager:
 
     def __init__(self, window_name: str, puzzle_type: str):
         self.ui = UI(window_name)
+        self.images = []
+        self.puzzle = Puzzle([])
         self.puzzle_type = puzzle_type
         self.puzzle_box = (0, 0, 0, 0)
         self.puzzle_size = (0, 0)
@@ -37,12 +61,60 @@ class PuzzleManager:
     def read_puzzle(self) -> None:
         self.ui.focus_window()
         self._init_puzzle_view()
+        self._init_puzzle()
 
-    def solve_puzzle(self) -> None:
-        self.ui.focus_window()
+    def solve_puzzle(self, solver: str) -> None:
+        SOLVERS[solver](self.puzzle).solve()
 
     def apply_puzzle(self) -> None:
+        # TODO implement for large puzzles with panning
+        # TODO implement applying in solve order
         self.ui.focus_window()
+        for y in range(self.puzzle_size[1]):
+            for x in range(self.puzzle_size[0]):
+                tile = self.puzzle.get_tile(x, y)
+                rotations = required_rotations(
+                    tile.initial_configuration,
+                    next(iter(tile.possible_configurations)),
+                    NEIGHBORS)
+                center = self._get_tile_center(x, y)
+                # TODO implement counter clockwise rotation
+                self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], 1, rotations)
+                if len(tile.possible_configurations) == 1:
+                    self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], 3)
+
+    def _init_puzzle(self):
+        # TODO implement puzzle init with panning
+        im = self.images[0].im
+        half_radius = min(self.puzzle_tile_size[0], self.puzzle_tile_size[1]) // 4
+        tiles = []
+        for y in range(self.puzzle_size[1]):
+            for x in range(self.puzzle_size[0]):
+                configuration = 0
+                tile_center = self._get_tile_center(x, y)
+                for angle in range(NEIGHBORS):
+                    xoff = int(math.cos(angle / NEIGHBORS * math.tau) * half_radius)
+                    yoff = int(math.sin(angle / NEIGHBORS * math.tau) * half_radius)
+                    if color_dist_sq(im.getpixel((tile_center[0] + xoff, tile_center[1] + yoff)), PIPE_BACKGROUND) <= 3:
+                        configuration |= 1 << angle
+                tiles.append(Tile(x, y, configuration, NEIGHBORS))
+        self.puzzle = Puzzle(tiles)
+        for y in range(self.puzzle_size[1]):
+            for x in range(self.puzzle_size[0]):
+                tile = self.puzzle.get_tile(x, y)
+                tile.neighbors.append(self.puzzle.get_tile(x + 1, y))
+                tile.neighbors.append(self.puzzle.get_tile(x if y % 2 == 0 else x + 1, y + 1))
+                tile.neighbors.append(self.puzzle.get_tile(x - 1 if y % 2 == 0 else x, y + 1))
+                tile.neighbors.append(self.puzzle.get_tile(x - 1, y))
+                tile.neighbors.append(self.puzzle.get_tile(x - 1 if y % 2 == 0 else x, y - 1))
+                tile.neighbors.append(self.puzzle.get_tile(x if y % 2 == 0 else x + 1, y - 1))
+
+        for y in range(self.puzzle_size[1]):
+            if y % 2 == 1:
+                print("", end="  ")
+            for x in range(self.puzzle_size[0]):
+                print("{:02}".format(self.puzzle.get_tile(x, y).initial_configuration), end="  ")
+            print()
 
     def _get_tile_center(self, x, y) -> Tuple[int, int]:
         xx = x if y % 2 == 0 else x + 0.5
@@ -56,10 +128,10 @@ class PuzzleManager:
                 self.puzzle_box = self._find_puzzle_box(im)
                 if self.puzzle_box[3] != im.size[1]:
                     return im.crop(self.puzzle_box)
-                self.ui.mouse_move(self.puzzle_box[0], self.puzzle_box[1])
                 self.ui.press_key("Down")
 
         im = _scroll_into_view()
+        self.images.append(PuzzleImage(0, 0, im))
 
         def _find_first_tile():
             for y in range(im.size[1]):
