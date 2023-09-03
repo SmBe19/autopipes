@@ -30,7 +30,7 @@ class UI:
         return im
 
     def mouse_move(self, x: int, y: int) -> None:
-        subprocess.run(['xdotool', 'mousemove', '--window', self.wid, str(x), str(y)])
+        subprocess.run(['xdotool', 'mousemove', str(x), str(y)])
 
     def mouse_click(self, x: int, y: int, button: int, repeat: int = 1) -> None:
         subprocess.run(
@@ -47,12 +47,12 @@ class UI:
              'keyup', 'ctrl'
              ])
 
-    def mouse_drag(self, x1: int, y1: int, x2: int, y2: int, button: int) -> None:
+    def mouse_drag(self, x: int, y: int, dx: int, dy: int, button: int = 1) -> None:
         subprocess.run(
             ['xdotool',
-             'mousemove', str(x1), str(y1),
+             'mousemove', str(x), str(y),
              'mousedown', str(button),
-             'mousemove', str(x2), str(y2),
+             'mousemove', str(x + dx), str(y + dy),
              'mouseup', str(button)])
 
     def key_down(self, keycode: str) -> None:
