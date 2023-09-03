@@ -35,16 +35,31 @@ class UI:
     def mouse_click(self, x: int, y: int, button: int, repeat: int = 1) -> None:
         subprocess.run(
             ['xdotool',
-             'mousemove', '--window', self.wid, str(x), str(y),
-             'click', '--window', self.wid, '--repeat', str(repeat), str(button)])
+             'mousemove', str(x), str(y),
+             'click', '--repeat', str(repeat), str(button)])
+
+    def mouse_ctrl_click(self, x: int, y: int, button: int, repeat: int = 1) -> None:
+        subprocess.run(
+            ['xdotool',
+             'mousemove', str(x), str(y),
+             'keydown', 'ctrl',
+             'click', '--repeat', str(repeat), str(button),
+             'keyup', 'ctrl'
+             ])
 
     def mouse_drag(self, x1: int, y1: int, x2: int, y2: int, button: int) -> None:
         subprocess.run(
             ['xdotool',
-             'mousemove', '--window', self.wid, str(x1), str(y1),
-             'mousedown', '--window', self.wid, str(button),
-             'mousemove', '--window', self.wid, str(x2), str(y2),
-             'mouseup', '--window', self.wid, str(button)])
+             'mousemove', str(x1), str(y1),
+             'mousedown', str(button),
+             'mousemove', str(x2), str(y2),
+             'mouseup', str(button)])
 
-    def press_key(self, keycode: str) -> None:
+    def key_down(self, keycode: str) -> None:
+        subprocess.run(['xdotool', 'keydown', str(keycode)])
+
+    def key_up(self, keycode: str) -> None:
+        subprocess.run(['xdotool', 'keyup', str(keycode)])
+
+    def key_press(self, keycode: str) -> None:
         subprocess.run(['xdotool', 'key', str(keycode)])

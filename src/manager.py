@@ -79,7 +79,13 @@ class PuzzleManager:
                     NEIGHBORS)
                 center = self._get_tile_center(x, y)
                 # TODO implement counter clockwise rotation
-                self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], 1, rotations)
+                if rotations > 0:
+                    if NEIGHBORS - rotations < rotations:
+                        self.ui.mouse_ctrl_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1],
+                                                 1, NEIGHBORS - rotations)
+                    else:
+                        self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], 1,
+                                            rotations)
                 if len(tile.possible_configurations) == 1:
                     self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], 3)
 
@@ -128,7 +134,7 @@ class PuzzleManager:
                 self.puzzle_box = self._find_puzzle_box(im)
                 if self.puzzle_box[3] != im.size[1]:
                     return im.crop(self.puzzle_box)
-                self.ui.press_key("Down")
+                self.ui.key_press("Down")
 
         im = _scroll_into_view()
         self.images.append(PuzzleImage(0, 0, im))
