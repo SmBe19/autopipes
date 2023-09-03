@@ -4,13 +4,16 @@ from typing import Tuple, List
 from PIL import Image
 
 from puzzle import Puzzle, Tile
-from solver import FirstSolver, RandomSolver
+from solver.bt import BtSolver
+from solver.logic import LogicSolver
+from solver.random import RandomSolver
 from ui import UI
 from util import color_dist_sq, required_rotations
 
 SOLVERS = {
     'random': RandomSolver,
-    'first': FirstSolver,
+    'logic': LogicSolver,
+    'bt': BtSolver,
 }
 
 PUZZLE_BOX_BORDER = (208, 221, 233)

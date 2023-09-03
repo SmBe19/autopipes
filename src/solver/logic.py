@@ -1,30 +1,15 @@
-import random
 from collections import deque
 
 from puzzle import Puzzle, Tile
 from util import is_connection
 
 
-class RandomSolver:
+class LogicSolver:
     puzzle: Puzzle
-
-    def __init__(self, puzzle: Puzzle):
-        self.puzzle = puzzle
-
-    def solve(self):
-        for tile in self.puzzle.tiles:
-            solution = random.choice(list(tile.possible_configurations))
-            tile.possible_configurations = {solution}
-
-
-class FirstSolver:
-    puzzle: Puzzle
-    tile_queue: deque
     solve_order: int
 
     def __init__(self, puzzle: Puzzle):
         self.puzzle = puzzle
-        self.tile_queue = deque()
         self.solve_order = 0
 
     def solve(self) -> None:
@@ -32,9 +17,10 @@ class FirstSolver:
             self._solve_one(tile)
 
     def _solve_one(self, start_tile: Tile):
-        self.tile_queue.append(start_tile)
-        while self.tile_queue:
-            tile = self.tile_queue.pop()
+        tile_queue = deque()
+        tile_queue.append(start_tile)
+        while tile_queue:
+            tile = tile_queue.pop()
             if not tile or len(tile.possible_configurations) == 1:
                 continue
             changed = False
@@ -50,7 +36,7 @@ class FirstSolver:
                     self.solve_order += 1
                 for neighbor in tile.neighbors:
                     if neighbor and len(neighbor.possible_configurations) > 1:
-                        self.tile_queue.appendleft(neighbor)
+                        tile_queue.appendleft(neighbor)
 
     def _check_configuration_possible(self, tile: Tile, configuration: int) -> bool:
         for i in range(len(tile.neighbors)):
@@ -91,12 +77,3 @@ class FirstSolver:
         for i in range(len(tile.neighbors)):
             if is_connection(configuration, i):
                 tile.union_components(tile.neighbors[i])
-
-
-class BtSolver:
-    puzzle: Puzzle
-
-    def __init__(self, puzzle: Puzzle):
-        self.puzzle = puzzle
-
-    # TODO implement backtracking solver

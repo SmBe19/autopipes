@@ -7,8 +7,9 @@ from manager import PuzzleManager
 def main():
     parser = argparse.ArgumentParser(description='Solve Hexapipes')
     parser.add_argument('--window-name', default='Pipes Puzzle - Chromium')
-    parser.add_argument('--solver', default='first', choices=['random', 'first'])
+    parser.add_argument('--solver', default='bt', choices=['random', 'logic', 'bt'])
     parser.add_argument('--solve-order', action='store_true')
+    parser.add_argument('--only-full-solution', action='store_true')
     parser.add_argument('--puzzle-type', '-t', default='hexagonal',
                         choices=['hexagonal', 'square', 'octogonal', 'etrar', 'cube'])
     args = parser.parse_args()
@@ -17,6 +18,9 @@ def main():
     manager = PuzzleManager(args.window_name, args.puzzle_type)
     manager.read_puzzle()
     manager.solve_puzzle(args.solver)
+    if args.only_full_solution and not manager.puzzle.is_solved():
+        print("Did not find full solution.")
+        return
     manager.apply_puzzle(args.solve_order)
 
 
