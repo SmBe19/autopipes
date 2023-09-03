@@ -20,14 +20,19 @@ class RandomSolver:
 class FirstSolver:
     puzzle: Puzzle
     tile_queue: deque
+    solve_order: int
 
     def __init__(self, puzzle: Puzzle):
         self.puzzle = puzzle
         self.tile_queue = deque()
+        self.solve_order = 0
 
     def solve(self) -> None:
-        for tile in self.puzzle.tiles:
-            self.tile_queue.appendleft(tile)
+        for tile in sorted(self.puzzle.tiles, key=lambda t: (t.y, t.x)):
+            self._solve_one(tile)
+
+    def _solve_one(self, start_tile: Tile):
+        self.tile_queue.append(start_tile)
         while self.tile_queue:
             tile = self.tile_queue.pop()
             if not tile or len(tile.possible_configurations) == 1:
@@ -39,7 +44,10 @@ class FirstSolver:
                     changed = True
             if changed:
                 if len(tile.possible_configurations) == 1:
+                    assert tile.solve_order == -1
                     self._merge_neighbors(tile)
+                    tile.solve_order = self.solve_order
+                    self.solve_order += 1
                 for neighbor in tile.neighbors:
                     if neighbor and len(neighbor.possible_configurations) > 1:
                         self.tile_queue.appendleft(neighbor)

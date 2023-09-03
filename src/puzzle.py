@@ -12,6 +12,7 @@ class Tile:
     component: "Tile"
     component_size: int
     component_exits: int
+    solve_order: int
 
     def __init__(self, x: int, y: int, configuration: int, neighbor_count: int):
         self.x = x
@@ -23,6 +24,7 @@ class Tile:
         self.component = self
         self.component_size = 1
         self.component_exits = connection_count(configuration)
+        self.solve_order = -1
 
     def find_component(self) -> "Tile":
         if self.component == self:

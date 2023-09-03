@@ -66,28 +66,23 @@ class PuzzleManager:
     def solve_puzzle(self, solver: str) -> None:
         SOLVERS[solver](self.puzzle).solve()
 
-    def apply_puzzle(self) -> None:
+    def apply_puzzle(self, solve_order: bool) -> None:
         # TODO implement for large puzzles with panning
-        # TODO implement applying in solve order
         self.ui.focus_window()
-        for y in range(self.puzzle_size[1]):
-            for x in range(self.puzzle_size[0]):
-                tile = self.puzzle.get_tile(x, y)
-                rotations = required_rotations(
-                    tile.initial_configuration,
-                    next(iter(tile.possible_configurations)),
-                    NEIGHBORS)
-                center = self._get_tile_center(x, y)
-                # TODO implement counter clockwise rotation
-                if rotations > 0:
-                    if NEIGHBORS - rotations < rotations:
-                        self.ui.mouse_ctrl_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1],
-                                                 1, NEIGHBORS - rotations)
-                    else:
-                        self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], 1,
-                                            rotations)
-                if len(tile.possible_configurations) == 1:
-                    self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], 3)
+        tiles = sorted(self.puzzle.tiles, key=lambda t: t.solve_order if solve_order else (t.y, t.x))
+        for tile in tiles:
+            if len(tile.possible_configurations) > 1:
+                continue
+            target_configuration = next(iter(tile.possible_configurations))
+            rotations = required_rotations(tile.initial_configuration, target_configuration, NEIGHBORS)
+            center = self._get_tile_center(tile.x, tile.y)
+            if rotations > 0:
+                if NEIGHBORS - rotations < rotations:
+                    self.ui.mouse_ctrl_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1],
+                                             1, NEIGHBORS - rotations)
+                else:
+                    self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], 1, rotations)
+            self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], 3)
 
     def _init_puzzle(self):
         # TODO implement puzzle init with panning
