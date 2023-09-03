@@ -28,8 +28,8 @@ class PuzzleManager:
         self.puzzle = Puzzle([])
         self.bridge = BRIDGES[puzzle_type](self.ui)
 
-    def read_puzzle(self) -> None:
-        self.puzzle = self.bridge.read_puzzle()
+    def read_puzzle(self, confirm_read: bool = False) -> None:
+        self.puzzle = self.bridge.read_puzzle(confirm_read)
 
     def solve_puzzle(self, solver: str) -> None:
         SOLVERS[solver](self.puzzle).solve()

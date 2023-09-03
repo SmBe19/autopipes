@@ -60,16 +60,17 @@ class HexagonalBridge(Bridge):
         self.puzzle_image = Image.new("RGB", (1, 1))
         self.view_state = ViewState()
 
-    def read_puzzle(self) -> Puzzle:
+    def read_puzzle(self, confirm_read: bool) -> Puzzle:
         self.ui.focus_window()
         self._init_puzzle_view_parameters()
-        puzzle = self._read_puzzle()
+        puzzle = self._read_puzzle(confirm_read)
         self._print_puzzle(puzzle)
         return puzzle
 
     def apply_puzzle(self, puzzle: Puzzle, solve_order: bool) -> None:
         self.ui.focus_window()
-        tiles = sorted(puzzle.tiles, key=lambda t: t.solve_order if solve_order else (t.y, t.x))
+        tiles = sorted(puzzle.tiles,
+                       key=lambda t: t.solve_order if solve_order else (t.y, t.x * (1 if t.y % 2 == 0 else -1)))
         for tile in tiles:
             if len(tile.possible_configurations) != 1:
                 continue
@@ -86,6 +87,7 @@ class HexagonalBridge(Bridge):
         self._pan_view_to_include_point(center[0], center[1])
         click_x = self.puzzle_box[0] + center[0] - self.view_state.view_offset[0]
         click_y = self.puzzle_box[1] + center[1] - self.view_state.view_offset[1]
+        # TODO fix wrong vertical panning in some cases
         assert (self.puzzle_box[0] <= click_x <= self.puzzle_box[2])
         assert (self.puzzle_box[1] <= click_y <= self.puzzle_box[3])
         if ctrl:
@@ -129,15 +131,15 @@ class HexagonalBridge(Bridge):
         if state.scrollable[0]:
             target_x = _calc_target(x, self.tile_parameters.grid_size[0], state.view_size[0], state.view_offset[0],
                                     state.total_size[0])
-            _perform_scrolls(state.view_offset[0], target_x, self.tile_parameters.tile_size[0] * 2, 1, 0)
+            _perform_scrolls(state.view_offset[0], target_x, self.tile_parameters.grid_size[0] * 2, 1, 0)
             state.view_offset = (target_x, state.view_offset[1])
         if state.scrollable[1]:
             target_y = _calc_target(y, self.tile_parameters.grid_size[1], state.view_size[1], state.view_offset[1],
                                     state.total_size[1])
-            _perform_scrolls(state.view_offset[1], target_y, self.tile_parameters.tile_size[1] * 2, 0, 1)
+            _perform_scrolls(state.view_offset[1], target_y, self.tile_parameters.grid_size[1] * 2, 0, 1)
             state.view_offset = (state.view_offset[0], target_y)
 
-    def _read_puzzle(self) -> Puzzle:
+    def _read_puzzle(self, confirm_read: bool) -> Puzzle:
         half_radius = min(self.tile_parameters.tile_size[0], self.tile_parameters.tile_size[1]) // 4
         tiles = []
         for y in range(self.puzzle_size[1]):
@@ -147,7 +149,8 @@ class HexagonalBridge(Bridge):
                 for angle in range(NEIGHBORS):
                     xoff = int(math.cos(angle / NEIGHBORS * math.tau) * half_radius)
                     yoff = int(math.sin(angle / NEIGHBORS * math.tau) * half_radius)
-                    if self._is_pipe_color(self.puzzle_image, tile_center[0] + xoff, tile_center[1] + yoff):
+                    if self._is_pipe_color(self.puzzle_image, tile_center[0] + xoff, tile_center[1] + yoff,
+                                           confirm_read):
                         configuration |= 1 << angle
                 tiles.append(Tile(x, y, configuration, NEIGHBORS))
         puzzle = Puzzle(tiles)
@@ -160,6 +163,10 @@ class HexagonalBridge(Bridge):
                 tile.neighbors.append(puzzle.get_tile(x - 1, y))
                 tile.neighbors.append(puzzle.get_tile(x - 1 if y % 2 == 0 else x, y - 1))
                 tile.neighbors.append(puzzle.get_tile(x if y % 2 == 0 else x + 1, y - 1))
+        if confirm_read:
+            self.puzzle_image.show()
+            print("Press enter to continue...")
+            input()
         return puzzle
 
     def _print_puzzle(self, puzzle: Puzzle) -> None:
@@ -207,7 +214,7 @@ class HexagonalBridge(Bridge):
         count_y = _count_tiles(0, 1)
         return count_x, count_y
 
-    def _is_pipe_color(self, im, x, y):
+    def _is_pipe_color(self, im: Image, x: int, y: int, color: bool = False) -> bool:
         radius = 5
         count = 0
         for yy in range(y - radius, y + radius):
@@ -215,6 +222,11 @@ class HexagonalBridge(Bridge):
                 if 0 <= xx < im.size[0] and 0 <= yy < im.size[1] and \
                         color_dist_sq(im.getpixel((xx, yy)), PIPE_BACKGROUND) <= PIPE_BACKGROUND_MARGIN:
                     count += 1
+                    if color:
+                        im.putpixel((xx, yy), (0, 255, 0))
+                else:
+                    if color:
+                        im.putpixel((xx, yy), (255, 0, 0))
         return count >= 7
 
     def _take_complete_screenshot(self):
@@ -327,8 +339,8 @@ class HexagonalBridge(Bridge):
 
         def _get_diff():
             sol = 0
-            for y in range(reference.size[1] // 2, reference.size[1], 10):
-                for x in range(reference.size[0] // 2, reference.size[0], 10):
+            for y in range(reference.size[1] // 2, reference.size[1], 50):
+                for x in range(reference.size[0] // 2, reference.size[0], 50):
                     sol += color_dist_sq(reference.getpixel((x, y)), offset.getpixel((x - cur_x, y - cur_y)))
             return sol
 
@@ -400,6 +412,7 @@ class HexagonalBridge(Bridge):
                 y += dy
             return (x - first_border_offset[0]) * dx + (y - first_border_offset[1]) * dy
 
+        # TODO make this more accurate to improve read reliability
         tile_width = _get_tile_size(1, 0)
         tile_height = _get_tile_size(0, 1)
 
@@ -408,7 +421,7 @@ class HexagonalBridge(Bridge):
                 im.getpixel((first_border_offset[0] + tile_width // 2, first_border_offset[1] + row_height)),
                 TILE_BACKGROUND) > TILE_BACKGROUND_MARGIN:
             row_height += 1
-        row_height -= 2
+        row_height -= 3
 
         return TileParameters(
             (tile_width, tile_height),

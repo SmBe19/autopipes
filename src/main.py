@@ -9,6 +9,7 @@ def main():
     parser.add_argument('--window-name', default='Pipes Puzzle - Chromium')
     parser.add_argument('--solver', default='bt', choices=['random', 'logic', 'bt'])
     parser.add_argument('--solve-order', action='store_true')
+    parser.add_argument('--confirm-read', action='store_true')
     parser.add_argument('--only-full-solution', action='store_true')
     parser.add_argument('--no-solve', action='store_true')
     parser.add_argument('--no-apply', action='store_true')
@@ -19,7 +20,7 @@ def main():
     time.sleep(0.5)
     manager = PuzzleManager(args.window_name, args.puzzle_type)
 
-    manager.read_puzzle()
+    manager.read_puzzle(args.confirm_read)
     if args.no_solve:
         return
 
