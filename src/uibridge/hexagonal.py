@@ -71,7 +71,7 @@ class HexagonalBridge(Bridge):
         self.ui.focus_window()
         tiles = sorted(puzzle.tiles, key=lambda t: t.solve_order if solve_order else (t.y, t.x))
         for tile in tiles:
-            if len(tile.possible_configurations) > 1:
+            if len(tile.possible_configurations) != 1:
                 continue
             target_configuration = next(iter(tile.possible_configurations))
             rotations = required_rotations(tile.initial_configuration, target_configuration, NEIGHBORS)
@@ -86,6 +86,8 @@ class HexagonalBridge(Bridge):
         self._pan_view_to_include_point(center[0], center[1])
         click_x = self.puzzle_box[0] + center[0] - self.view_state.view_offset[0]
         click_y = self.puzzle_box[1] + center[1] - self.view_state.view_offset[1]
+        assert (self.puzzle_box[0] <= click_x <= self.puzzle_box[2])
+        assert (self.puzzle_box[1] <= click_y <= self.puzzle_box[3])
         if ctrl:
             self.ui.mouse_ctrl_click(click_x, click_y, button, repeat)
         else:
@@ -206,12 +208,14 @@ class HexagonalBridge(Bridge):
         return count_x, count_y
 
     def _is_pipe_color(self, im, x, y):
-        for yy in range(y - 5, y + 5, 2):
-            for xx in range(x - 5, x + 5, 2):
+        radius = 5
+        count = 0
+        for yy in range(y - radius, y + radius):
+            for xx in range(x - radius, x + radius):
                 if 0 <= xx < im.size[0] and 0 <= yy < im.size[1] and \
                         color_dist_sq(im.getpixel((xx, yy)), PIPE_BACKGROUND) <= PIPE_BACKGROUND_MARGIN:
-                    return True
-        return False
+                    count += 1
+        return count >= 7
 
     def _take_complete_screenshot(self):
         first_im = self._puzzle_box_screenshot()

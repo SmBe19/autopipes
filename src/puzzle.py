@@ -74,5 +74,8 @@ class Puzzle:
         return self.tile_lookup.get(y, {}).get(x)
 
     def is_solved(self):
-        assert all(len(tile.possible_configurations) >= 1 for tile in self.tiles)
+        for tile in self.tiles:
+            if len(tile.possible_configurations) == 0:
+                raise Exception(f"Tile at {tile.x}/{tile.y} (initial={tile.initial_configuration}) "
+                                f"does not have any possible configurations.")
         return all(len(tile.possible_configurations) == 1 for tile in self.tiles)
