@@ -74,4 +74,5 @@ class Puzzle:
         return self.tile_lookup.get(y, {}).get(x)
 
     def is_solved(self):
+        assert all(len(tile.possible_configurations) >= 1 for tile in self.tiles)
         return all(len(tile.possible_configurations) == 1 for tile in self.tiles)

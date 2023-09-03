@@ -1,6 +1,7 @@
 import os
 import subprocess
 import tempfile
+from typing import List, Tuple
 
 from PIL import Image
 
@@ -48,12 +49,22 @@ class UI:
              ])
 
     def mouse_drag(self, x: int, y: int, dx: int, dy: int, button: int = 1) -> None:
+        self.mouse_drag_path(x, y, [(dx, dy)], button)
+
+    def mouse_drag_path(self, x: int, y: int, delta: List[Tuple[int, int]], button: int = 1) -> None:
+        moves = []
+        dx = 0
+        dy = 0
+        for d in delta:
+            dx += d[0]
+            dy += d[1]
+            moves.extend(['mousemove', str(x + dx), str(y + dy), 'sleep', '0.2'])
         subprocess.run(
             ['xdotool',
              'mousemove', str(x), str(y),
-             'mousedown', str(button),
-             'mousemove', str(x + dx), str(y + dy),
-             'mouseup', str(button)])
+             'mousedown', str(button)] +
+            moves +
+            ['mouseup', str(button)])
 
     def key_down(self, keycode: str) -> None:
         subprocess.run(['xdotool', 'keydown', str(keycode)])

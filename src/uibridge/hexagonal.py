@@ -34,10 +34,14 @@ class TileParameters:
 class ViewState:
     scrollable: Tuple[bool, bool]
     view_offset: Tuple[int, int]
+    view_size: Tuple[int, int]
+    total_size: Tuple[int, int]
 
     def __init__(self):
         self.scrollable = (False, False)
         self.view_offset = (0, 0)
+        self.view_size = (0, 0)
+        self.total_size = (0, 0)
 
 
 class HexagonalBridge(Bridge):
@@ -78,12 +82,58 @@ class HexagonalBridge(Bridge):
     def _click_tile(self, x: int, y: int, button: int, ctrl: bool = False, repeat: int = 1):
         if repeat <= 0:
             return
-        # TODO pan if not in view
         center = self._get_tile_center(x, y)
+        self._pan_view_to_include_point(center[0], center[1])
+        click_x = self.puzzle_box[0] + center[0] - self.view_state.view_offset[0]
+        click_y = self.puzzle_box[1] + center[1] - self.view_state.view_offset[1]
         if ctrl:
-            self.ui.mouse_ctrl_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], button, repeat)
+            self.ui.mouse_ctrl_click(click_x, click_y, button, repeat)
         else:
-            self.ui.mouse_click(self.puzzle_box[0] + center[0], self.puzzle_box[1] + center[1], button, repeat)
+            self.ui.mouse_click(click_x, click_y, button, repeat)
+
+    def _pan_view_to_include_point(self, x: int, y: int):
+        state = self.view_state
+
+        def _calc_target(target: int, target_border: int, size: int, offset: int, total_size: int) -> int:
+            if target - target_border < offset:
+                return max(0, target - size // 2)
+            if target + target_border > offset + size:
+                return min(total_size - size, target + size // 2)
+            return offset
+
+        def _perform_scrolls(offset: int, target: int, scroll_amount: int, dx: int, dy: int):
+            if target == offset:
+                return
+            diff = target - offset
+            # We need to swap the sign because dragging moves stuff in the other direction
+            direction = -1 if diff > 0 else 1
+            diff = abs(diff)
+            while diff >= scroll_amount:
+                self.ui.mouse_drag(
+                    (self.puzzle_box[0] + self.puzzle_box[2]) // 2,
+                    (self.puzzle_box[1] + self.puzzle_box[3]) // 2,
+                    scroll_amount * dx * direction,
+                    scroll_amount * dy * direction,
+                )
+                diff -= scroll_amount
+            if diff > 0:
+                self.ui.mouse_drag_path(
+                    (self.puzzle_box[0] + self.puzzle_box[2]) // 2,
+                    (self.puzzle_box[1] + self.puzzle_box[3]) // 2,
+                    [(scroll_amount * dx * direction, scroll_amount * dy * direction),
+                     ((diff - scroll_amount) * dx * direction, (diff - scroll_amount) * dy * direction)],
+                )
+
+        if state.scrollable[0]:
+            target_x = _calc_target(x, self.tile_parameters.grid_size[0], state.view_size[0], state.view_offset[0],
+                                    state.total_size[0])
+            _perform_scrolls(state.view_offset[0], target_x, self.tile_parameters.tile_size[0] * 2, 1, 0)
+            state.view_offset = (target_x, state.view_offset[1])
+        if state.scrollable[1]:
+            target_y = _calc_target(y, self.tile_parameters.grid_size[1], state.view_size[1], state.view_offset[1],
+                                    state.total_size[1])
+            _perform_scrolls(state.view_offset[1], target_y, self.tile_parameters.tile_size[1] * 2, 0, 1)
+            state.view_offset = (state.view_offset[0], target_y)
 
     def _read_puzzle(self) -> Puzzle:
         half_radius = min(self.tile_parameters.tile_size[0], self.tile_parameters.tile_size[1]) // 4
@@ -153,7 +203,6 @@ class HexagonalBridge(Bridge):
 
         count_x = _count_tiles(1, 0)
         count_y = _count_tiles(0, 1)
-
         return count_x, count_y
 
     def _is_pipe_color(self, im, x, y):
@@ -172,13 +221,15 @@ class HexagonalBridge(Bridge):
             borders[1] < 5 or borders[3] > first_im.size[1] - 5,
         )
         self.view_state.scrollable = scrollable
+        self.view_state.view_size = first_im.size
 
         if not scrollable[0] and not scrollable[1]:
             self.puzzle_image = first_im
+            self.view_state.total_size = first_im.size
             return
 
-        scroll_amount_x = int(self.tile_parameters.tile_size[0] * 4)
-        scroll_amount_y = int(self.tile_parameters.tile_size[1] * 4)
+        scroll_amount_x = self.tile_parameters.tile_size[0] * 4
+        scroll_amount_y = self.tile_parameters.tile_size[1] * 4
 
         # Make sure we start at the very end
         if scrollable[0]:
@@ -262,6 +313,7 @@ class HexagonalBridge(Bridge):
                     offset_y += last_offset_y - scroll_amount_y
                 full_im.paste(im, (offset_x, offset_y, offset_x + im.size[0], offset_y + im.size[1]))
         self.puzzle_image = full_im
+        self.view_state.total_size = full_im.size
 
     def _determine_image_offset(
             self, reference: Image, offset: Image, expected: Tuple[int, int], delta: Tuple[int, int]
