@@ -15,3 +15,11 @@ def required_rotations(initial_configuration: int, desired_configuration: int, n
         if rotate_configuration(initial_configuration, i, neighbors) == desired_configuration:
             return i
     return 0
+
+
+def is_connection(configuration: int, index: int) -> bool:
+    return (configuration & (1 << index)) > 0
+
+
+def connection_count(configuration: int) -> int:
+    return bin(configuration).count("1")

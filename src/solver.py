@@ -2,7 +2,7 @@ import random
 from collections import deque
 
 from puzzle import Puzzle, Tile
-from util import rotate_configuration
+from util import is_connection
 
 
 class RandomSolver:
@@ -30,7 +30,7 @@ class FirstSolver:
             self.tile_queue.appendleft(tile)
         while self.tile_queue:
             tile = self.tile_queue.pop()
-            if len(tile.possible_configurations) == 1:
+            if not tile or len(tile.possible_configurations) == 1:
                 continue
             changed = False
             for configuration in list(tile.possible_configurations):
@@ -38,21 +38,29 @@ class FirstSolver:
                     tile.possible_configurations.remove(configuration)
                     changed = True
             if changed:
+                if len(tile.possible_configurations) == 1:
+                    self._merge_neighbors(tile)
                 for neighbor in tile.neighbors:
-                    if neighbor:
+                    if neighbor and len(neighbor.possible_configurations) > 1:
                         self.tile_queue.appendleft(neighbor)
 
     def _check_configuration_possible(self, tile: Tile, configuration: int) -> bool:
-        # TODO detect loops and too small trees
-        tile_single = self._is_single(tile)
         for i in range(len(tile.neighbors)):
-            connection = (configuration & (1 << i)) > 0
+            connection = is_connection(configuration, i)
             neighbor = tile.neighbors[i]
-            if not neighbor or (tile_single and self._is_single(neighbor)):
+            if not neighbor:
                 if connection:
                     return False
                 else:
                     continue
+            if connection and len(neighbor.possible_configurations) > 1:
+                c1 = tile.find_component()
+                c2 = neighbor.find_component()
+                if c1 == c2:
+                    return False
+                if c1.component_exits + c2.component_exits - 2 == 0 and \
+                        c1.component_size + c2.component_size != len(self.puzzle.tiles):
+                    return False
             reverse_index = self._get_reverse_index(tile, neighbor)
             if not self._check_connection_possible(neighbor, reverse_index, connection):
                 return False
@@ -60,7 +68,7 @@ class FirstSolver:
 
     def _check_connection_possible(self, tile: Tile, index: int, connection: bool) -> bool:
         for configuration in tile.possible_configurations:
-            if ((configuration & (1 << index)) > 0) == connection:
+            if is_connection(configuration, index) == connection:
                 return True
         return False
 
@@ -70,10 +78,17 @@ class FirstSolver:
                 return i
         raise Exception("No reverse neighbor found")
 
-    def _is_single(self, tile: Tile):
+    def _merge_neighbors(self, tile: Tile):
+        configuration = next(iter(tile.possible_configurations))
         for i in range(len(tile.neighbors)):
-            if rotate_configuration(tile.initial_configuration, i, len(tile.neighbors)) == 1:
-                return True
-        return False
+            if is_connection(configuration, i):
+                tile.union_components(tile.neighbors[i])
 
-# TODO implement proper solver
+
+class BtSolver:
+    puzzle: Puzzle
+
+    def __init__(self, puzzle: Puzzle):
+        self.puzzle = puzzle
+
+    # TODO implement backtracking solver
