@@ -234,7 +234,7 @@ class HexagonalBridge(Bridge):
         count = 0
         for yy in range(y - radius, y + radius):
             for xx in range(x - radius, x + radius):
-                if not 0 <= xx < im.size[0] and 0 <= yy < im.size[1]:
+                if not (0 <= xx < im.size[0] and 0 <= yy < im.size[1]):
                     continue
                 if color_dist_sq(im.getpixel((xx, yy)), PIPE_BACKGROUND) <= PIPE_BACKGROUND_MARGIN:
                     count += 1
