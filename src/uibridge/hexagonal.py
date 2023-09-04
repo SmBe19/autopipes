@@ -219,7 +219,7 @@ class HexagonalBridge(Bridge):
             x = 0
             y = 0
             xx, yy = self._get_tile_center(x, y)
-            while xx < im.size[0] and yy < im.size[1] and self._is_pipe_color(im, xx, yy, 10):
+            while xx < im.size[0] and yy < im.size[1] and self._is_pipe_color(im, xx, yy, 20):
                 count += 1
                 x += dx
                 y += dy
