@@ -88,7 +88,6 @@ class HexagonalBridge(Bridge):
         self._pan_view_to_include_point(center[0], center[1])
         click_x = self.puzzle_box[0] + center[0] - self.view_state.view_offset[0]
         click_y = self.puzzle_box[1] + center[1] - self.view_state.view_offset[1]
-        # TODO fix wrong vertical panning in some cases
         assert (self.puzzle_box[0] <= click_x <= self.puzzle_box[2])
         assert (self.puzzle_box[1] <= click_y <= self.puzzle_box[3])
         if ctrl:
@@ -100,10 +99,8 @@ class HexagonalBridge(Bridge):
         state = self.view_state
 
         def _calc_target(target: int, target_border: int, size: int, offset: int, total_size: int) -> int:
-            if target - target_border < offset:
-                return max(0, target - size // 2)
-            if target + target_border > offset + size:
-                return min(total_size - size, target + size // 2)
+            if target - target_border < offset or target + target_border > offset + size:
+                return max(0, min(total_size - size, target - size // 2))
             return offset
 
         def _perform_scrolls(offset: int, target: int, scroll_amount: int, dx: int, dy: int):
@@ -238,6 +235,8 @@ class HexagonalBridge(Bridge):
     def _take_complete_screenshot(self):
         first_im = self._puzzle_box_screenshot()
         borders = self._find_puzzle_borders(first_im)
+        # TODO the view might actually not be scrollable,
+        #  but due to zooming a part of the puzzle might be out of the view.
         scrollable = (
             borders[0] < 5 or borders[2] > first_im.size[0] - 5,
             borders[1] < 5 or borders[3] > first_im.size[1] - 5,
@@ -420,8 +419,6 @@ class HexagonalBridge(Bridge):
             im.putpixel((borders[2], im.size[1] // 2 - 100 + i), (0, 0, 255))
             im.putpixel((im.size[0] // 2 - 100 + i, borders[1]), (0, 0, 255))
             im.putpixel((im.size[0] // 2 - 100 + i, borders[3]), (0, 0, 255))
-
-        print("Grid:", grid_width, grid_height, estimated_parameters.grid_size)
 
         return TileParameters(
             estimated_parameters.tile_size,
