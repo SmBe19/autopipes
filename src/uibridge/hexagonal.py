@@ -21,11 +21,12 @@ NEIGHBORS = 6
 
 
 class TileParameters:
-    tile_size: Tuple[int, int]
+    tile_size: Tuple[float, float]
     first_tile_offset: Tuple[int, int]
-    grid_size: Tuple[int, int]
+    grid_size: Tuple[float, float]
 
-    def __init__(self, tile_size: Tuple[int, int], first_tile_offset: Tuple[int, int], grid_size: Tuple[int, int]):
+    def __init__(self, tile_size: Tuple[float, float], first_tile_offset: Tuple[int, int],
+                 grid_size: Tuple[float, float]):
         self.tile_size = tile_size
         self.first_tile_offset = first_tile_offset
         self.grid_size = grid_size
@@ -129,18 +130,18 @@ class HexagonalBridge(Bridge):
                 )
 
         if state.scrollable[0]:
-            target_x = _calc_target(x, self.tile_parameters.grid_size[0], state.view_size[0], state.view_offset[0],
+            target_x = _calc_target(x, int(self.tile_parameters.grid_size[0]), state.view_size[0], state.view_offset[0],
                                     state.total_size[0])
-            _perform_scrolls(state.view_offset[0], target_x, self.tile_parameters.grid_size[0] * 2, 1, 0)
+            _perform_scrolls(state.view_offset[0], target_x, int(self.tile_parameters.grid_size[0] * 2), 1, 0)
             state.view_offset = (target_x, state.view_offset[1])
         if state.scrollable[1]:
-            target_y = _calc_target(y, self.tile_parameters.grid_size[1], state.view_size[1], state.view_offset[1],
+            target_y = _calc_target(y, int(self.tile_parameters.grid_size[1]), state.view_size[1], state.view_offset[1],
                                     state.total_size[1])
-            _perform_scrolls(state.view_offset[1], target_y, self.tile_parameters.grid_size[1] * 2, 0, 1)
+            _perform_scrolls(state.view_offset[1], target_y, int(self.tile_parameters.grid_size[1] * 2), 0, 1)
             state.view_offset = (state.view_offset[0], target_y)
 
     def _read_puzzle(self, confirm_read: bool) -> Puzzle:
-        half_radius = min(self.tile_parameters.tile_size[0], self.tile_parameters.tile_size[1]) // 4
+        half_radius = min(self.tile_parameters.tile_size[0], self.tile_parameters.tile_size[1]) / 4
         tiles = []
         for y in range(self.puzzle_size[1]):
             for x in range(self.puzzle_size[0]):
@@ -149,7 +150,7 @@ class HexagonalBridge(Bridge):
                 for angle in range(NEIGHBORS):
                     xoff = int(math.cos(angle / NEIGHBORS * math.tau) * half_radius)
                     yoff = int(math.sin(angle / NEIGHBORS * math.tau) * half_radius)
-                    if self._is_pipe_color(self.puzzle_image, tile_center[0] + xoff, tile_center[1] + yoff,
+                    if self._is_pipe_color(self.puzzle_image, tile_center[0] + xoff, tile_center[1] + yoff, 5,
                                            confirm_read):
                         configuration |= 1 << angle
                 tiles.append(Tile(x, y, configuration, NEIGHBORS))
@@ -164,6 +165,10 @@ class HexagonalBridge(Bridge):
                 tile.neighbors.append(puzzle.get_tile(x - 1 if y % 2 == 0 else x, y - 1))
                 tile.neighbors.append(puzzle.get_tile(x if y % 2 == 0 else x + 1, y - 1))
         if confirm_read:
+            for y in range(self.puzzle_size[1]):
+                for x in range(self.puzzle_size[0]):
+                    center = self._get_tile_center(x, y)
+                    self.puzzle_image.putpixel(center, (0, 0, 255))
             self.puzzle_image.show()
             print("Press enter to continue...")
             input()
@@ -186,11 +191,13 @@ class HexagonalBridge(Bridge):
         self._scroll_puzzle_box_into_view()
         self.puzzle_box = self._find_puzzle_box(self.ui.get_screenshot())
         self._zoom_puzzle()
-        self.tile_parameters = self._determine_tile_parameters(self._puzzle_box_screenshot())
+        self.tile_parameters = self._estimate_tile_parameters(self._puzzle_box_screenshot())
         self._take_complete_screenshot()
         # Taking the screenshot might have moved us
-        self.tile_parameters = self._determine_tile_parameters(self.puzzle_image)
+        self.tile_parameters = self._estimate_tile_parameters(self.puzzle_image)
         self.puzzle_size = self._find_puzzle_size(self.puzzle_image)
+        self.tile_parameters = self._determine_tile_parameters(self.puzzle_image, self.puzzle_size,
+                                                               self.tile_parameters)
 
         print("Puzzle size:", self.puzzle_size)
 
@@ -203,7 +210,7 @@ class HexagonalBridge(Bridge):
             x = 0
             y = 0
             xx, yy = self._get_tile_center(x, y)
-            while xx < im.size[0] and yy < im.size[1] and self._is_pipe_color(im, xx, yy):
+            while xx < im.size[0] and yy < im.size[1] and self._is_pipe_color(im, xx, yy, 10):
                 count += 1
                 x += dx
                 y += dy
@@ -214,8 +221,7 @@ class HexagonalBridge(Bridge):
         count_y = _count_tiles(0, 1)
         return count_x, count_y
 
-    def _is_pipe_color(self, im: Image, x: int, y: int, color: bool = False) -> bool:
-        radius = 5
+    def _is_pipe_color(self, im: Image, x: int, y: int, radius: int, color: bool = False) -> bool:
         count = 0
         for yy in range(y - radius, y + radius):
             for xx in range(x - radius, x + radius):
@@ -227,7 +233,7 @@ class HexagonalBridge(Bridge):
                 else:
                     if color:
                         im.putpixel((xx, yy), (255, 0, 0))
-        return count >= 7
+        return count >= radius
 
     def _take_complete_screenshot(self):
         first_im = self._puzzle_box_screenshot()
@@ -244,8 +250,8 @@ class HexagonalBridge(Bridge):
             self.view_state.total_size = first_im.size
             return
 
-        scroll_amount_x = self.tile_parameters.tile_size[0] * 4
-        scroll_amount_y = self.tile_parameters.tile_size[1] * 4
+        scroll_amount_x = int(self.tile_parameters.tile_size[0] * 4)
+        scroll_amount_y = int(self.tile_parameters.tile_size[1] * 4)
 
         # Make sure we start at the very end
         if scrollable[0]:
@@ -357,16 +363,26 @@ class HexagonalBridge(Bridge):
 
     def _find_puzzle_borders(self, im: Image) -> Tuple[int, int, int, int]:
         def _find_horizontal(y: int, dy: int):
+            start = int(im.size[0] * 0.4)
+            end = int(im.size[0] * 0.6)
+            if end - start < 200:
+                start = max(0, im.size[0] // 2 - 100)
+                end = min(im.size[0], im.size[0] // 2 + 100)
             while y < im.size[1]:
-                for x in range(int(im.size[0] * 0.4), int(im.size[0] * 0.6)):
+                for x in range(start, end, 2):
                     if color_dist_sq(im.getpixel((x, y)), TILE_BORDER) <= TILE_BORDER_MARGIN:
                         return y
                 y += dy
             raise Exception("Border not found")
 
         def _find_vertical(x: int, dx: int):
+            start = int(im.size[1] * 0.4)
+            end = int(im.size[1] * 0.6)
+            if end - start < 200:
+                start = max(0, im.size[1] // 2 - 100)
+                end = min(im.size[1], im.size[1] // 2 + 100)
             while x < im.size[0]:
-                for y in range(int(im.size[1] * 0.4), int(im.size[1] * 0.6)):
+                for y in range(start, end, 2):
                     if color_dist_sq(im.getpixel((x, y)), TILE_BORDER) <= TILE_BORDER_MARGIN:
                         return x
                 x += dx
@@ -381,7 +397,7 @@ class HexagonalBridge(Bridge):
     def _zoom_puzzle(self) -> None:
         for _ in range(10):
             im = self._puzzle_box_screenshot()
-            tile_parameters = self._determine_tile_parameters(im)
+            tile_parameters = self._estimate_tile_parameters(im)
             # noinspection PyChainedComparisons
             if tile_parameters.tile_size[0] > 80 and \
                     tile_parameters.tile_size[1] > 80 and \
@@ -392,7 +408,28 @@ class HexagonalBridge(Bridge):
             self.ui.mouse_click(self.puzzle_box[0] + borders[0] + 10, self.puzzle_box[1] + borders[1] + 10, 4)
         raise Exception("Unable to zoom to recognize puzzle")
 
-    def _determine_tile_parameters(self, im: Image) -> TileParameters:
+    def _determine_tile_parameters(self, im: Image, puzzle_size: Tuple[int, int],
+                                   estimated_parameters: TileParameters) -> TileParameters:
+        borders = self._find_puzzle_borders(im)
+        grid_width = (borders[2] - borders[0]) / (puzzle_size[0] + 0.5)
+        grid_height = (borders[3] - borders[1] -
+                       (estimated_parameters.tile_size[1] - estimated_parameters.grid_size[1])) / (puzzle_size[1])
+
+        for i in range(200):
+            im.putpixel((borders[0], im.size[1] // 2 - 100 + i), (0, 0, 255))
+            im.putpixel((borders[2], im.size[1] // 2 - 100 + i), (0, 0, 255))
+            im.putpixel((im.size[0] // 2 - 100 + i, borders[1]), (0, 0, 255))
+            im.putpixel((im.size[0] // 2 - 100 + i, borders[3]), (0, 0, 255))
+
+        print("Grid:", grid_width, grid_height, estimated_parameters.grid_size)
+
+        return TileParameters(
+            estimated_parameters.tile_size,
+            estimated_parameters.first_tile_offset,
+            (grid_width, grid_height),
+        )
+
+    def _estimate_tile_parameters(self, im: Image) -> TileParameters:
         def _find_first_tile():
             for y in range(im.size[1]):
                 for x in range(im.size[0]):
@@ -412,7 +449,6 @@ class HexagonalBridge(Bridge):
                 y += dy
             return (x - first_border_offset[0]) * dx + (y - first_border_offset[1]) * dy
 
-        # TODO make this more accurate to improve read reliability
         tile_width = _get_tile_size(1, 0)
         tile_height = _get_tile_size(0, 1)
 
@@ -421,7 +457,7 @@ class HexagonalBridge(Bridge):
                 im.getpixel((first_border_offset[0] + tile_width // 2, first_border_offset[1] + row_height)),
                 TILE_BACKGROUND) > TILE_BACKGROUND_MARGIN:
             row_height += 1
-        row_height -= 3
+        row_height -= 2
 
         return TileParameters(
             (tile_width, tile_height),
