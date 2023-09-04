@@ -70,8 +70,18 @@ class HexagonalBridge(Bridge):
 
     def apply_puzzle(self, puzzle: Puzzle, solve_order: bool) -> None:
         self.ui.focus_window()
-        tiles = sorted(puzzle.tiles,
-                       key=lambda t: t.solve_order if solve_order else (t.y, t.x * (1 if t.y % 2 == 0 else -1)))
+        block_width = self.view_state.view_size[0] // self.tile_parameters.grid_size[0] // 2
+        block_height = self.view_state.view_size[1] // self.tile_parameters.grid_size[1] // 2
+        if solve_order:
+            tiles = sorted(puzzle.tiles, key=lambda t: t.solve_order)
+        else:
+            tiles = sorted(puzzle.tiles,
+                           key=lambda t: (
+                               t.y // block_height,
+                               (t.x // block_width) * (1 if (t.y // block_height) % 2 == 0 else -1),
+                               t.y,
+                               t.x * (1 if t.y % 2 == 0 else -1)
+                           ))
         for tile in tiles:
             if len(tile.possible_configurations) != 1:
                 continue
@@ -169,6 +179,8 @@ class HexagonalBridge(Bridge):
             self.puzzle_image.show()
             print("Press enter to continue...")
             input()
+        for tile in tiles:
+            assert tile.initial_configuration != 0
         return puzzle
 
     def _print_puzzle(self, puzzle: Puzzle) -> None:
@@ -222,8 +234,9 @@ class HexagonalBridge(Bridge):
         count = 0
         for yy in range(y - radius, y + radius):
             for xx in range(x - radius, x + radius):
-                if 0 <= xx < im.size[0] and 0 <= yy < im.size[1] and \
-                        color_dist_sq(im.getpixel((xx, yy)), PIPE_BACKGROUND) <= PIPE_BACKGROUND_MARGIN:
+                if not 0 <= xx < im.size[0] and 0 <= yy < im.size[1]:
+                    continue
+                if color_dist_sq(im.getpixel((xx, yy)), PIPE_BACKGROUND) <= PIPE_BACKGROUND_MARGIN:
                     count += 1
                     if color:
                         im.putpixel((xx, yy), (0, 255, 0))
